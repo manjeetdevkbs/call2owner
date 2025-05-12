@@ -1,0 +1,13 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/call2owner/Utilities/bin
+/call2owner/Utilities/obj
+/call2owner/Oversight/obj
+/call2owner/Oversight/bin
+/call2owner/call2owner/obj
+/call2owner/call2owner/bin/Debug/net8.0
+/call2owner/.vs/call2owner/FileContentIndex
+/call2owner/.vs/call2owner/v17
+/.vs

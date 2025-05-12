@@ -1,0 +1,6 @@
+@call2owner_HostAddress = http://localhost:5200
+
+GET {{call2owner_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
