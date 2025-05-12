@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Oversight;
@@ -10,6 +9,7 @@ using RestSharp;
 using System.Reflection;
 using System.Text;
 using Utilities;
+using Microsoft.EntityFrameworkCore;
 
 var publicEndpoints = new HashSet<string>
 {
@@ -44,20 +44,16 @@ builder.Services.AddCors(options =>
 });
 
 
-// Add services to the container.
 builder.Services.AddDbContext<DataContext>(options =>
 {
-
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
 });
 
 builder.Services.Configure<MailSettings>(builder.Configuration.GetSection("MailSettings"));
 
-
 var key = Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:Key"] ?? throw new InvalidOperationException("JWT Secret Key not found!"));
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
-
     {
         options.RequireHttpsMetadata = false;
         options.SaveToken = true;

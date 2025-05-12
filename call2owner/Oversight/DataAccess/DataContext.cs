@@ -19,64 +19,7 @@ namespace Oversight
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<ModulePermission>(entity =>
-            {
-                entity.HasIndex(e => e.ModuleId, "IX_ModulePermissions_ModuleId");
-
-                entity.HasOne(d => d.Module)
-                    .WithMany(p => p.ModulePermissions)
-                    .HasForeignKey(d => d.ModuleId);
-
-                // JSON stored as TEXT
-                entity.Property(e => e.PermissionsJson)
-                    .HasColumnType("TEXT")
-                    .IsRequired();
-            });
-
-            modelBuilder.Entity<Role>(entity =>
-            {
-                entity.HasIndex(e => e.ParentRoleId, "IX_Roles_ParentRoleId");
-
-                entity.HasOne(d => d.ParentRole)
-                    .WithMany(p => p.InverseParentRole)
-                    .HasForeignKey(d => d.ParentRoleId)
-                    .OnDelete(DeleteBehavior.SetNull)
-                    .HasConstraintName("FK_Roles_ParentRoleId");
-            });
-
-            modelBuilder.Entity<RoleClaim>(entity =>
-            {
-                entity.HasIndex(e => e.RoleId, "IX_RoleClaims_RoleId");
-
-                entity.HasOne(d => d.Role)
-                    .WithMany(p => p.RoleClaims)
-                    .HasForeignKey(d => d.RoleId)
-                    .HasConstraintName("FK_RoleClaims_Roles");
-
-                // JSON stored as TEXT
-                entity.Property(e => e.ModulePermissionsJson)
-                    .HasColumnType("TEXT")
-                    .IsRequired();
-            });
-
-            modelBuilder.Entity<User>(entity =>
-            {
-                entity.HasIndex(e => e.RoleId, "IX_Users_RoleId");
-
-                entity.HasIndex(e => e.Email, "Users_Email_key")
-                    .IsUnique();
-
-                //entity.HasIndex(e => e.MobileNumber, "Users_MobileNumber_key")
-                //    .IsUnique();
-
-                entity.Property(e => e.IsActive).HasDefaultValueSql("true");
-                entity.Property(e => e.IsVerified).HasDefaultValueSql("false");
-
-                entity.HasOne(d => d.Role)
-                    .WithMany(p => p.Users)
-                    .HasForeignKey(d => d.RoleId)
-                    .HasConstraintName("FK_Users_Roles");
-            });
+            
 
             OnModelCreatingPartial(modelBuilder);
         }
