@@ -916,60 +916,75 @@ namespace Oversight.Controllers
 
         public static async Task SeedSuperAdminAsync(DataContext context)
         {
-            // Define role hierarchy with manually assigned IDs
             var roleHierarchy = new List<(int Id, string RoleName, int? ParentRoleId)>
-        {
-            (301, "SuperAdmin", null),
-            (302, "OverWriter", 301),
-            (303, "UnderWriter", 302),
-            (304, "MasterBroker", 303),
-            (305, "Broker", 304),
-            (306, "ClaimUser", 304),
-            (307, "FinanceUser", 304)
-        };
+                                {
+                                    (301, "SuperAdmin", null),
+                                    (302, "OverWriter", 301),
+                                    (303, "UnderWriter", 302),
+                                    (304, "MasterBroker", 303),
+                                    (305, "Broker", 304),
+                                    (306, "ClaimUser", 304),
+                                    (307, "FinanceUser", 304)
+                                };
 
-            // Fetch existing roles from the database
             var existingRoles = await context.Roles.ToDictionaryAsync(r => r.RoleName, r => r);
 
-            // Seed roles with manually assigned IDs
-            foreach (var (id, roleName, parentRoleId) in roleHierarchy)
+            // Begin transaction to ensure consistency
+            using var transaction = await context.Database.BeginTransactionAsync();
+
+            try
             {
-                if (!existingRoles.ContainsKey(roleName))
+                await context.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT Roles ON");
+
+                foreach (var (id, roleName, parentRoleId) in roleHierarchy)
                 {
-                    var role = new Role
+                    if (!existingRoles.ContainsKey(roleName))
                     {
-                        Id = id, // Manually setting ID
-                        RoleName = roleName,
-                        ParentRoleId = parentRoleId
-                    };
-                    await context.Roles.AddAsync(role);
-                    await context.SaveChangesAsync(); // Save immediately to ensure parent roles exist
+                        var role = new Role
+                        {
+                            Id = id,
+                            RoleName = roleName,
+                            ParentRoleId = parentRoleId
+                        };
 
-                    // Update dictionary to prevent duplicate inserts
-                    existingRoles[roleName] = role;
+                        await context.Roles.AddAsync(role);
+                        await context.SaveChangesAsync();
+
+                        existingRoles[roleName] = role;
+                    }
                 }
-            }
 
+                await context.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT Roles OFF");
 
-            // Ensure SuperAdmin user exists
-            var superAdminRole = existingRoles["SuperAdmin"];
-            if (superAdminRole != null && !await context.Users.AnyAsync(u => u.Email == "superadmin@gmail.com"))
-            {
-                var superAdmin = new User
+                // Seed SuperAdmin user
+                var superAdminRole = existingRoles["SuperAdmin"];
+                if (superAdminRole != null && !await context.Users.AnyAsync(u => u.Email == "superadmin@gmail.com"))
                 {
-                    FirstName = "Super",
-                    LastName = "Admin",
-                    Email = "superadmin@gmail.com",
-                    MobileNumber = "1122334455",
-                    RoleId = superAdminRole.Id, // Assign correct RoleId
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("Super@123"),
-                    IsActive = true,
-                    IsVerified = true
-                };
-                await context.Users.AddAsync(superAdmin);
-                await context.SaveChangesAsync();
+                    var superAdmin = new User
+                    {
+                        FirstName = "Super",
+                        LastName = "Admin",
+                        Email = "superadmin@gmail.com",
+                        MobileNumber = "1122334455",
+                        RoleId = superAdminRole.Id,
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword("Super@123"),
+                        IsActive = true,
+                        IsVerified = true
+                    };
+
+                    await context.Users.AddAsync(superAdmin);
+                    await context.SaveChangesAsync();
+                }
+
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
             }
         }
+
 
         public static bool IsBase64String(string base64)
         {
