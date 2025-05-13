@@ -61,81 +61,94 @@ namespace Oversight.Controllers
 
         public async Task<IActionResult> SelfRegisterResident([FromBody] UserResidentDto dto)
         {
+            if (dto == null || (dto.Email == null && dto.MobileNumber == null))
+            {
+                return BadRequest("Invalid request: Email or Mobile Number is required.");
+            }
+
             OTPGenerator otpGenerator = new OTPGenerator();
             string otp = otpGenerator.GenerateOTP();
 
-            var newGuid = Guid.NewGuid();
+            var existingUser = await _context.Users
+                                             .FirstOrDefaultAsync(u => u.MobileNumber == dto.MobileNumber);
 
-            // Get user using phone mumber
-            var user = new User
+            if (existingUser != null)
             {
-                MobileNumber = dto.MobileNumber,
-                OTP = otp,
-                OtpExpireTime = DateTime.UtcNow.AddMinutes(5),
-                ResendOtpTime = DateTime.UtcNow.AddMinutes(2),
-                RoleId = 1,
-                OtpValidatedOn = null,
-            };
+                // Update OTP for existing user
+                existingUser.OTP = otp;
+                existingUser.OtpExpireTime = DateTime.UtcNow.AddMinutes(5);
+                existingUser.ResendOtpTime = DateTime.UtcNow.AddMinutes(2);
+                existingUser.IsActive = true;
+                existingUser.IsVerified = true;
 
-            await _context.Users.AddAsync(user);
+                _context.Users.Update(existingUser);
+            }
+            else
+            {
+                // Create new user
+                var newUser = new User
+                {
+                    MobileNumber = dto.MobileNumber,
+                    OTP = otp,
+                    OtpExpireTime = DateTime.UtcNow.AddMinutes(5),
+                    ResendOtpTime = DateTime.UtcNow.AddMinutes(2),
+                    RoleId = 304, // Assuming RoleId 304 is for Resident
+                    OtpValidatedOn = null,
+                    IsActive = true,
+                    IsVerified = true
+                };
+
+                await _context.Users.AddAsync(newUser);
+            }
+
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "User registered successfully! Check your email to set a password." });
+            var message = $"Your one time password {otp} for WLTPE sign-in. Valid for 10 mins. Do not share your OTP with anyone - Yoke Payment.";
+            await SendOtpAsync(dto.MobileNumber, message);
+
+            return Ok(new { message = "OTP sent successfully!" });
         }
+
+
 
         [AllowAnonymous]
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginSelfDto model)
         {
-            _logger.LogInformation("This is a test log from Application Insights");
-            _logger.LogError("This is a test log from Application Insights");
+            _logger.LogInformation("Login attempt with OTP for: {UserName}", model.UserName);
 
             var user = await _context.Users
                 .Include(u => u.Role)
-                    .ThenInclude(r => r.RoleClaims) // Include RoleClaims under Role
+                    .ThenInclude(r => r.RoleClaims)
                 .FirstOrDefaultAsync(u => u.Email == model.UserName || u.MobileNumber == model.UserName);
 
-            if (user == null || !user.IsActive.GetValueOrDefault() || !user.IsVerified.GetValueOrDefault())
-                return Unauthorized(new { message = "Account is not active or verified. Please reset your password." });
+            if (user == null)
+                return Unauthorized(new { message = "Invalid user credentials." });
 
+            if (!user.IsActive.GetValueOrDefault() || !user.IsVerified.GetValueOrDefault())
+                return Unauthorized(new { message = "Account is not active or verified. Please contact support." });
 
-            //var hashedPassword = BCrypt.Net.BCrypt.HashPassword(model.Password);
+            // ✅ OTP Validation
+            if (user.OTP != model.OTP || user.OtpExpireTime < DateTime.UtcNow)
+                return Unauthorized(new { message = "Invalid or expired OTP." });
 
-            // Check OTP
+            // ✅ Clear OTP after successful login (optional but recommended)
+            user.OTP = null;
+            user.OtpValidatedOn = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
 
-            var roleClaimValues = user.Role.RoleClaims
-                                .OrderBy(rc => rc.Id)
-                                .Select(rc => rc.ModulePermissionsJson.ToString())
-                                .FirstOrDefault();
+            // ✅ Get RoleClaims
+            var roleClaimValues = user.Role?.RoleClaims
+                                    .OrderBy(rc => rc.Id)
+                                    .Select(rc => rc.ModulePermissionsJson.ToString())
+                                    .FirstOrDefault();
 
-
+            // ✅ Generate JWT Token
             var token = GenerateJwtToken(user, roleClaimValues);
 
-            UserDto userDto = _mapper.Map<UserDto>(user); // Convert to DTOs
+            var userDto = _mapper.Map<UserDto>(user);
 
-            object insurerData = null;
-
-            // Check if user is Insurer
-            if (user.Role?.Id == Convert.ToInt32(UserRoles.InsurerAdmin))
-            {
-                var request = new RestRequest("https://outinsurer.kindlebit.com/api/Insurer/getAllInsurers", Method.Get);
-                //var request = new RestRequest("https://localhost:7046/api/Insurer/getAllInsurers", Method.Get);
-                request.AddHeader("accept", "*/*");
-                request.AddHeader("Authorization", $"Bearer {token}");
-
-                var response = await _client.ExecuteAsync(request);
-
-                if (response.IsSuccessful && !string.IsNullOrEmpty(response.Content))
-                {
-                    var insurers = System.Text.Json.JsonSerializer.Deserialize<List<InsurerDto>>(response.Content, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
-
-                    // Match insurer based on Email or UserID
-                    insurerData = insurers?.FirstOrDefault(i => i.Email == user.Email);
-                }
-            }
+            object insurerData = null; // Placeholder for future logic
 
             return Ok(new { token, role = user.Role?.RoleName, User = userDto, InsurerId = insurerData });
         }
@@ -178,6 +191,26 @@ namespace Oversight.Controllers
 
             var token = tokenHandler.CreateToken(tokenDescriptor);
             return tokenHandler.WriteToken(token);
+        }
+
+        private async Task<string> SendOtpAsync(string number, string message)
+        {
+            try
+            {
+                HttpClient client = new HttpClient();
+
+                HttpResponseMessage response = await client.GetAsync(
+                    $"https://sms.shreetripada.com/api/sendapi.php?auth_key=3515HOtE6VZwXu51ewmgrO&mobiles={number}&message={message}&sender=YKPYMT&templateid=1007843886982450229");
+                response.EnsureSuccessStatusCode();
+                string responseBody = await response.Content.ReadAsStringAsync();
+                return responseBody;
+            }
+            catch (HttpRequestException e)
+            {
+                Console.WriteLine("\nException Caught!");
+                Console.WriteLine("Message :{0} ", e.Message);
+                return null;
+            }
         }
     }
 

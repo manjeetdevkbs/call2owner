@@ -940,6 +940,14 @@ namespace Oversight.Controllers
                 {
                     if (!existingRoles.ContainsKey(roleName))
                     {
+                        var trackedEntity = context.ChangeTracker.Entries<Role>()
+                                                   .FirstOrDefault(e => e.Entity.Id == id);
+
+                        if (trackedEntity != null)
+                        {
+                            trackedEntity.State = EntityState.Detached;
+                        }
+
                         var role = new Role
                         {
                             Id = id,
@@ -948,11 +956,17 @@ namespace Oversight.Controllers
                         };
 
                         await context.Roles.AddAsync(role);
-                        await context.SaveChangesAsync();
 
                         existingRoles[roleName] = role;
                     }
                 }
+
+                await context.SaveChangesAsync();
+
+                await context.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT Roles OFF");
+
+
+                await context.SaveChangesAsync();
 
                 await context.Database.ExecuteSqlRawAsync("SET IDENTITY_INSERT Roles OFF");
 
@@ -981,7 +995,6 @@ namespace Oversight.Controllers
             catch
             {
                 await transaction.RollbackAsync();
-                throw;
             }
         }
 
