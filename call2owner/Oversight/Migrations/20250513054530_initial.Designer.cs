@@ -12,7 +12,7 @@ using Oversight;
 namespace Oversight.Migrations
 {
     [DbContext(typeof(DataContext))]
-    [Migration("20250512191042_initial")]
+    [Migration("20250513054530_initial")]
     partial class initial
     {
         /// <inheritdoc />
@@ -140,11 +140,9 @@ namespace Oversight.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("Email")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FirstName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<bool?>("IsActive")
@@ -157,17 +155,37 @@ namespace Oversight.Migrations
                         .HasColumnType("bit");
 
                     b.Property<string>("LastName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("MobileNumber")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int?>("ModifiedBy")
                         .HasColumnType("int");
 
+                    b.Property<string>("OTP")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime?>("OtpExpireTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("OtpValidatedOn")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("PasswordHash")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RefreshToken")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("RefreshTokenExpireTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ResendOtpTime")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("RoleId")
                         .HasColumnType("int");
