@@ -593,8 +593,8 @@ namespace Oversight.Controllers
             return Ok(userList);
         }
 
-        [Authorize(Policy = Utilities.Module.Auth)]
-        [Authorize(Policy = Utilities.Permission.GetAll)]
+        //[Authorize(Policy = Utilities.Module.Auth)]
+        //[Authorize(Policy = Utilities.Permission.GetAll)]
         [HttpGet("getAllRoles")]
         public async Task<IActionResult> GetAllRoles()
         {

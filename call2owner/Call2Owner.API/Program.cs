@@ -113,7 +113,7 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Oversight API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Call2Owner.API", Version = "v1" });
 
     // Add JWT Authentication to Swagger
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
